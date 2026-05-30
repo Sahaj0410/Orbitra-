@@ -148,7 +148,7 @@ function safeJsonParse(text) {
   try {
     return JSON.parse(text);
   } catch {
-    const match = text.match(/\{[\s\S]*\}/);
+    const match = text.match(/(\[[\s\S]*\]|\{[\s\S]*\})/);
     if (!match) {
       return null;
     }
@@ -184,29 +184,52 @@ function normalizeBookings(bookings) {
 
   if (typeof bookings === "string") {
     const parsed = safeJsonParse(bookings);
-    if (Array.isArray(parsed)) {
-      return parsed;
+    if (parsed) {
+      return normalizeBookings(parsed);
     }
     return parseBookingsFromText(bookings);
   }
 
   if (Array.isArray(bookings)) {
-    return bookings
-      .map((item) => {
-        if (typeof item === "string") {
-          const parsed = safeJsonParse(item);
-          if (parsed) {
-            return parsed;
-          }
-          const parsedText = parseBookingsFromText(item);
-          return parsedText.length ? parsedText[0] : null;
-        }
-        return item;
-      })
-      .filter(Boolean);
+    return bookings.flatMap((item) => normalizeBookingItem(item)).filter(Boolean);
   }
 
-  return [];
+  return normalizeBookingItem(bookings);
+}
+
+function normalizeBookingItem(item) {
+  if (!item) {
+    return [];
+  }
+
+  if (typeof item === "string") {
+    const parsed = safeJsonParse(item);
+    if (parsed) {
+      return normalizeBookings(parsed);
+    }
+
+    return parseBookingsFromText(item);
+  }
+
+  if (Array.isArray(item)) {
+    return normalizeBookings(item);
+  }
+
+  if (typeof item !== "object") {
+    return [];
+  }
+
+  const normalized = {
+    type: stringifyField(item.type),
+    provider: stringifyField(item.provider),
+    confirmation: stringifyField(item.confirmation),
+    date: stringifyField(item.date),
+    time: stringifyField(item.time),
+    location: stringifyField(item.location),
+    notes: stringifyField(item.notes)
+  };
+
+  return Object.values(normalized).some(Boolean) ? [normalized] : [];
 }
 
 function parseBookingsFromText(text) {
@@ -224,7 +247,11 @@ function parseBookingsFromText(text) {
       let match;
       while ((match = pattern.exec(block)) !== null) {
         const key = match[1].toLowerCase();
-        const value = match[2].trim().replace(/^['"]|['"]$/g, "");
+        const value = match[2]
+          .trim()
+          .replace(/^['"]|['"]$/g, "")
+          .replace(/['"],?\s*\+\s*$/g, "")
+          .replace(/\\n/g, " ");
         booking[key] = value;
       }
       return Object.keys(booking).length ? booking : null;
@@ -242,7 +269,18 @@ function normalizeDays(days) {
     return Array.isArray(parsed) ? parsed : [];
   }
 
-  return Array.isArray(days) ? days : [];
+  return Array.isArray(days)
+    ? days
+        .filter((day) => day && typeof day === "object")
+        .map((day, index) => ({
+          date: stringifyField(day.date) || `Day ${index + 1}`,
+          title: stringifyField(day.title) || `Day ${index + 1}`,
+          morning: stringifyField(day.morning),
+          afternoon: stringifyField(day.afternoon),
+          evening: stringifyField(day.evening),
+          logistics: stringifyField(day.logistics)
+        }))
+    : [];
 }
 
 function normalizeStringArray(items) {
@@ -255,5 +293,21 @@ function normalizeStringArray(items) {
     return Array.isArray(parsed) ? parsed : [items];
   }
 
-  return Array.isArray(items) ? items : [];
+  return Array.isArray(items) ? items.map(stringifyField).filter(Boolean) : [];
+}
+
+function stringifyField(value) {
+  if (value === null || value === undefined) {
+    return "";
+  }
+
+  if (typeof value === "string") {
+    return value.trim();
+  }
+
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+
+  return "";
 }
