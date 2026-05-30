@@ -2,9 +2,12 @@ import OpenAI from "openai";
 
 export async function generateItinerary({ extractedText, notes }) {
   if (!process.env.OPENAI_API_KEY) {
+    if (process.env.OPENROUTER_API_KEY) {
+      return generateWithOpenRouter({ extractedText, notes });
+    }
     const hfResult = await generateWithHuggingFace({ extractedText, notes });
     if (!hfResult) {
-      throw new Error("AI generation failed. Configure a valid OpenAI or Hugging Face API key.");
+      throw new Error("AI generation failed. Configure a valid OpenAI, OpenRouter, or Hugging Face API key.");
     }
     return hfResult;
   }
@@ -40,6 +43,48 @@ ${extractedText.slice(0, 12000)}`
   const content = completion.choices[0]?.message?.content;
   if (!content) {
     throw new Error("AI generation failed. OpenAI returned an empty response.");
+  }
+
+  return normalizeAiPayload(JSON.parse(content));
+}
+
+async function generateWithOpenRouter({ extractedText, notes }) {
+  const client = new OpenAI({
+    apiKey: process.env.OPENROUTER_API_KEY,
+    baseURL: "https://openrouter.ai/api/v1"
+  });
+  const model = process.env.OPENROUTER_MODEL || "google/gemma-2-2b-it";
+
+  const completion = await client.chat.completions.create({
+    model,
+    response_format: { type: "json_object" },
+    messages: [
+      {
+        role: "system",
+        content:
+          "You create concise, practical travel itineraries from booking text. Return valid JSON only."
+      },
+      {
+        role: "user",
+        content: `Create a structured travel itinerary from the following booking data.
+
+Return JSON with keys: title, destination, startDate, endDate, summary, days, bookings, tips.
+days must be an array with date, title, morning, afternoon, evening, logistics.
+bookings must include type, provider, confirmation, date, time, location, notes when available.
+
+User notes:
+${notes || "None"}
+
+Extracted booking text:
+${extractedText.slice(0, 12000)}`
+      }
+    ],
+    temperature: 0.35
+  });
+
+  const content = completion.choices[0]?.message?.content;
+  if (!content) {
+    throw new Error("AI generation failed. OpenRouter returned an empty response.");
   }
 
   return normalizeAiPayload(JSON.parse(content));
