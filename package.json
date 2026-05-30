@@ -9,6 +9,8 @@
     "install:all": "npm install && npm install --prefix server && npm install --prefix client"
   },
   "devDependencies": {
-    "concurrently": "^9.1.0"
+    "concurrently": "^9.1.0",
+    "pdf-lib": "^1.17.1",
+    "pdfkit": "^0.17.1"
   }
 }

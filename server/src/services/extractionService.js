@@ -5,9 +5,17 @@ import Tesseract from "tesseract.js";
 
 export async function extractTextFromFile(file) {
   if (file.mimetype === "application/pdf") {
-    const buffer = await fs.readFile(file.path);
-    const parsed = await pdfParse(buffer);
-    return normalizeText(parsed.text);
+    try {
+      const buffer = await fs.readFile(file.path);
+      const parsed = await pdfParse(buffer);
+      return normalizeText(parsed.text);
+    } catch {
+      return [
+        `PDF uploaded: ${file.originalname}.`,
+        "The PDF could not be parsed, so only metadata and notes will be used.",
+        "Try exporting the file again if you want full extraction."
+      ].join(" ");
+    }
   }
 
   if (file.mimetype.startsWith("image/") && process.env.OPENAI_API_KEY) {
