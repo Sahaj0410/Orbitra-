@@ -220,8 +220,7 @@ function parseBookingsFromText(text) {
   return sourceBlocks
     .map((block) => {
       const booking = {};
-      const pattern = /(type|provider|confirmation|date|time|location|notes)\s*:\s*([^
-\r}]+)/gi;
+      const pattern = /(type|provider|confirmation|date|time|location|notes)\s*:\s*([^\n\r}]+)/gi;
       let match;
       while ((match = pattern.exec(block)) !== null) {
         const key = match[1].toLowerCase();
