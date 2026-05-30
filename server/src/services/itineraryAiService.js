@@ -184,7 +184,10 @@ function normalizeBookings(bookings) {
 
   if (typeof bookings === "string") {
     const parsed = safeJsonParse(bookings);
-    return Array.isArray(parsed) ? parsed : [];
+    if (Array.isArray(parsed)) {
+      return parsed;
+    }
+    return parseBookingsFromText(bookings);
   }
 
   if (Array.isArray(bookings)) {
@@ -192,7 +195,11 @@ function normalizeBookings(bookings) {
       .map((item) => {
         if (typeof item === "string") {
           const parsed = safeJsonParse(item);
-          return parsed || null;
+          if (parsed) {
+            return parsed;
+          }
+          const parsedText = parseBookingsFromText(item);
+          return parsedText.length ? parsedText[0] : null;
         }
         return item;
       })
@@ -200,6 +207,30 @@ function normalizeBookings(bookings) {
   }
 
   return [];
+}
+
+function parseBookingsFromText(text) {
+  if (!text || typeof text !== "string") {
+    return [];
+  }
+
+  const blocks = text.match(/\{[\s\S]*?\}/g) || [];
+  const sourceBlocks = blocks.length ? blocks : [text];
+
+  return sourceBlocks
+    .map((block) => {
+      const booking = {};
+      const pattern = /(type|provider|confirmation|date|time|location|notes)\s*:\s*([^
+\r}]+)/gi;
+      let match;
+      while ((match = pattern.exec(block)) !== null) {
+        const key = match[1].toLowerCase();
+        const value = match[2].trim().replace(/^['"]|['"]$/g, "");
+        booking[key] = value;
+      }
+      return Object.keys(booking).length ? booking : null;
+    })
+    .filter(Boolean);
 }
 
 function normalizeDays(days) {
