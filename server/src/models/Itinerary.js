@@ -43,7 +43,7 @@ const itinerarySchema = new mongoose.Schema(
     ],
     bookings: [
       {
-        type: String,
+        type: { type: String },  // ← fixed: prevents Mongoose from misreading "type" as a schema keyword
         provider: String,
         confirmation: String,
         date: String,
