@@ -162,14 +162,68 @@ function safeJsonParse(text) {
 }
 
 function normalizeAiPayload(payload) {
+  const parsedBookings = normalizeBookings(payload.bookings);
+  const parsedDays = normalizeDays(payload.days);
+  const parsedTips = normalizeStringArray(payload.tips);
   return {
     title: payload.title || "AI Travel Itinerary",
     destination: payload.destination || "Upcoming trip",
     startDate: payload.startDate || "",
     endDate: payload.endDate || "",
     summary: payload.summary || "",
-    days: Array.isArray(payload.days) ? payload.days : [],
-    bookings: Array.isArray(payload.bookings) ? payload.bookings : [],
-    tips: Array.isArray(payload.tips) ? payload.tips : []
+    days: parsedDays,
+    bookings: parsedBookings,
+    tips: parsedTips
   };
+}
+
+function normalizeBookings(bookings) {
+  if (!bookings) {
+    return [];
+  }
+
+  if (typeof bookings === "string") {
+    const parsed = safeJsonParse(bookings);
+    return Array.isArray(parsed) ? parsed : [];
+  }
+
+  if (Array.isArray(bookings)) {
+    return bookings
+      .map((item) => {
+        if (typeof item === "string") {
+          const parsed = safeJsonParse(item);
+          return parsed || null;
+        }
+        return item;
+      })
+      .filter(Boolean);
+  }
+
+  return [];
+}
+
+function normalizeDays(days) {
+  if (!days) {
+    return [];
+  }
+
+  if (typeof days === "string") {
+    const parsed = safeJsonParse(days);
+    return Array.isArray(parsed) ? parsed : [];
+  }
+
+  return Array.isArray(days) ? days : [];
+}
+
+function normalizeStringArray(items) {
+  if (!items) {
+    return [];
+  }
+
+  if (typeof items === "string") {
+    const parsed = safeJsonParse(items);
+    return Array.isArray(parsed) ? parsed : [items];
+  }
+
+  return Array.isArray(items) ? items : [];
 }
